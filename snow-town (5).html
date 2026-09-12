@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>עיירת השלג הקטנה</title>
+<style>
+  :root{
+    --sky1:#cfeaff;
+    --sky2:#eaf7ff;
+    --snow-white:#ffffff;
+    --snow-shadow:#dcecf7;
+    --pink:#ff8fb3;
+    --pink-dark:#ff6b98;
+    --blue:#5b9bd5;
+    --brown:#8a5a34;
+    --text:#4a4038;
+    --panel:#fffaf3;
+    --radius:22px;
+    font-family: "Varela Round","Segoe UI Rounded","Segoe UI",Arial,sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--sky1);color:var(--text);user-select:none;}
+  #app{position:relative;width:100%;height:100%;}
+
+  /* ---------- generic screen handling ---------- */
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;}
+  .screen.active{display:flex;}
+
+  button{font-family:inherit;cursor:pointer;border:none;outline:none;}
+  .btn{
+    background:linear-gradient(180deg,#ffffff,#f0f0f0);
+    border-radius:999px;padding:14px 34px;font-size:20px;font-weight:700;
+    color:var(--text);box-shadow:0 6px 0 #d8d0c5, 0 10px 18px rgba(0,0,0,0.12);
+    transition:transform .1s ease;
+  }
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #d8d0c5, 0 4px 10px rgba(0,0,0,0.12);}
+  .btn.pink{background:linear-gradient(180deg,#ffb6cf,var(--pink));color:#fff;box-shadow:0 6px 0 #d1567f,0 10px 18px rgba(0,0,0,.15);}
+  .btn.pink:active{box-shadow:0 2px 0 #d1567f,0 4px 10px rgba(0,0,0,.15);}
+  .btn.small{padding:8px 18px;font-size:15px;}
+
+  /* ---------- falling snow (global) ---------- */
+  #snowLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:5;}
+  .flake{position:absolute;top:-5%;border-radius:50%;background:#fff;opacity:.85;filter:blur(.2px);
+    animation-name:fall,sway; animation-timing-function:linear,ease-in-out; animation-iteration-count:infinite,infinite;}
+  @keyframes fall{ from{transform:translateY(-10vh);} to{transform:translateY(110vh);} }
+  @keyframes sway{ 0%,100%{margin-left:0px;} 50%{margin-left:22px;} }
+
+  /* ---------- START SCREEN ---------- */
+  #screen-start{background:linear-gradient(180deg,var(--sky1),var(--sky2) 60%, #fff);}
+  .title-card{position:relative;z-index:6;text-align:center;padding:30px;}
+  .title-card h1{font-size:44px;margin:0 0 6px;color:var(--pink-dark);text-shadow:0 3px 0 #fff, 0 6px 10px rgba(0,0,0,.08);}
+  .title-card p{font-size:18px;margin:0 0 26px;color:#6b6058;}
+  .title-hill{position:absolute;bottom:0;left:0;right:0;height:34%;background:var(--snow-white);
+    border-radius:50% 50% 0 0 / 100% 100% 0 0;box-shadow:0 -6px 0 var(--snow-shadow) inset;}
+  .title-tree{position:absolute;bottom:14%;width:70px;}
+  .title-tree.t1{left:8%;transform:scale(1.1);}
+  .title-tree.t2{right:10%;transform:scale(1.4);}
+  .title-tree.t3{left:26%;transform:scale(.8);}
+
+  /* ---------- CHARACTER SELECT ---------- */
+  #screen-select{background:linear-gradient(180deg,var(--sky1),var(--sky2));}
+  .select-title{font-size:30px;color:var(--pink-dark);margin-bottom:18px;text-align:center;}
+  .select-row{display:flex;gap:34px;z-index:6;}
+  .char-card{background:var(--panel);border-radius:var(--radius);padding:18px 22px 22px;
+    box-shadow:0 10px 0 #ecd9c2,0 16px 24px rgba(0,0,0,.12);text-align:center;cursor:pointer;
+    border:4px solid transparent;transition:transform .15s ease, border-color .15s ease;width:170px;}
+  .char-card:hover{transform:translateY(-6px);}
+  .char-card.chosen{border-color:var(--pink);}
+  .char-card .name{margin-top:8px;font-size:20px;font-weight:700;}
+  .char-card svg{width:120px;height:160px;}
+
+  /* ---------- GAME SCREEN ---------- */
+  #screen-game{inset:0;}
+  #topbar{position:absolute;top:0;left:0;right:0;height:56px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 14px;z-index:20;pointer-events:none;}
+  #topbar > *{pointer-events:auto;}
+  #areaLabel{background:rgba(255,255,255,.85);padding:8px 18px;border-radius:999px;font-weight:700;font-size:16px;box-shadow:0 3px 8px rgba(0,0,0,.1);}
+  #menuBtn{background:rgba(255,255,255,.9);}
+
+  .stage{position:absolute;inset:0;overflow:hidden;}
+  .scene{position:absolute;inset:0;display:none;}
+  .scene.active{display:block;}
+
+  #character{position:absolute;width:96px;height:132px;z-index:15;touch-action:none;cursor:grab;
+    transition:filter .15s;}
+  #character.grabbing{cursor:grabbing;filter:drop-shadow(0 10px 6px rgba(0,0,0,.25));}
+  #character.sitting{transform:scale(.94) translateY(6px);}
+  #character svg{width:100%;height:100%;display:block;overflow:visible;}
+  #character .shadow{position:absolute;bottom:-4px;left:14px;width:66px;height:16px;background:rgba(60,50,40,.18);border-radius:50%;filter:blur(1px);}
+
+  /* Bottom nav */
+  #navbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;
+    background:rgba(255,255,255,.88);padding:8px 10px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.15);z-index:25;}
+  .navbtn{width:52px;height:52px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:24px;box-shadow:0 3px 0 #e3d8c9 inset, 0 3px 0 rgba(0,0,0,.1);border:3px solid rgba(0,0,0,.12);transition:transform .1s;}
+  .navbtn:active{transform:scale(.9);}
+  .navbtn.active{border-color:var(--pink);background:#ffe9f0;transform:translateY(-3px);}
+
+  /* ---- STREET SCENE ---- */
+  .sky{position:absolute;inset:0;background:linear-gradient(180deg,#bfe0ff 0%,#e8f6ff 55%,#ffffff 100%);}
+  .ground{position:absolute;bottom:0;left:0;right:0;height:38%;background:var(--snow-white);
+    box-shadow:0 -4px 0 var(--snow-shadow) inset;}
+  .sun{position:absolute;top:24px;right:40px;width:56px;height:56px;border-radius:50%;background:#fff6cf;box-shadow:0 0 30px 10px #fff6cf88;}
+  .cloud{position:absolute;background:#fff;border-radius:40px;opacity:.9;}
+  .pine{position:absolute;bottom:30%;cursor:pointer;transform-origin:bottom center;}
+  .pine .tri{width:0;height:0;border-left:26px solid transparent;border-right:26px solid transparent;border-bottom:40px solid #4f8f6b;margin:0 auto;filter:drop-shadow(0 2px 0 #3f7256) drop-shadow(0 0 0 3px rgba(0,0,0,.08));}
+  .pine .tri:nth-child(2){border-bottom-width:34px;border-left-width:22px;border-right-width:22px;margin-top:-16px;}
+  .pine .tri:nth-child(3){border-bottom-width:28px;border-left-width:18px;border-right-width:18px;margin-top:-14px;}
+  .pine .trunk{width:10px;height:14px;background:#7a5636;margin:0 auto;border-radius:2px;}
+  .pine .cap{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:36px;height:10px;background:#fff;border-radius:50%;opacity:.9;}
+  .pine.shake{animation:shake .5s ease;}
+  @keyframes shake{ 0%,100%{transform:rotate(0);} 25%{transform:rotate(-4deg);} 75%{transform:rotate(4deg);} }
+
+  .building{position:absolute;bottom:32%;cursor:pointer;text-align:center;filter:drop-shadow(0 5px 0 rgba(0,0,0,.12));}
+  .building .roof{width:0;height:0;margin:0 auto;filter:drop-shadow(0 3px 0 rgba(0,0,0,.15));}
+  .building .wall{border-radius:14px 14px 6px 6px;position:relative;border:5px solid rgba(0,0,0,.16);box-shadow:0 4px 0 rgba(0,0,0,.08) inset;}
+  .building .door{position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-radius:10px 10px 0 0;border:4px solid rgba(0,0,0,.18);border-bottom:none;}
+  .building .win{position:absolute;background:#bfe6ff;border:4px solid #fff;border-radius:8px;box-shadow:0 0 0 3px rgba(0,0,0,.14);}
+  .building .label{margin-top:6px;font-weight:800;background:#fff;padding:4px 12px;border-radius:999px;font-size:13px;
+    box-shadow:0 3px 0 rgba(0,0,0,.1);border:2px solid rgba(0,0,0,.08);display:inline-block;}
+  .building.pop{animation:pop .3s ease;}
+  @keyframes pop{ 50%{transform:scale(.94);} }
+
+  .snowman-mini{position:absolute;bottom:30%;cursor:pointer;}
+  .snowman-mini svg{width:70px;height:90px;}
+
+  /* Sitting chair icon reused in rooms */
+  .chair{position:absolute;cursor:pointer;}
+  .chair svg{width:70px;height:70px;}
+
+  .room-bg{position:absolute;inset:0;}
+  .wallpaper{position:absolute;inset:0 0 30% 0;}
+  .floor{position:absolute;bottom:0;left:0;right:0;height:30%;}
+
+  .speech{position:absolute;background:#fff;padding:8px 14px;border-radius:16px;font-size:14px;font-weight:700;
+    box-shadow:0 4px 10px rgba(0,0,0,.15);opacity:0;transition:opacity .25s, transform .25s;transform:translateY(6px) scale(.9);white-space:nowrap;z-index:30;pointer-events:none;}
+  .speech.show{opacity:1;transform:translateY(0) scale(1);}
+
+  .back-arrow{position:absolute;top:66px;right:14px;background:rgba(255,255,255,.9);border-radius:999px;padding:8px 16px;font-weight:700;z-index:20;box-shadow:0 3px 8px rgba(0,0,0,.12);}
+
+  /* ---- SHOP SCENE ---- */
+  .shop-bg{position:absolute;inset:0;background:linear-gradient(180deg,#fff0f5,#ffffff 70%);}
+  .shop-rail{background:rgba(255,255,255,.85);border-radius:20px;padding:10px 14px;margin:0 auto;
+    box-shadow:0 6px 16px rgba(0,0,0,.08);}
+  #shopPanel{position:absolute;left:0;right:0;bottom:78px;top:110px;overflow-y:auto;padding:0 14px;z-index:15;}
+  .cat-title{font-weight:700;margin:10px 4px 6px;font-size:15px;color:#8a5a34;}
+  .swatch-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .swatch{width:56px;height:56px;border-radius:16px;background:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 3px 0 rgba(0,0,0,.08);border:3px solid transparent;cursor:grab;position:relative;}
+  .swatch.selected{border-color:var(--pink);}
+  .swatch .dot{width:32px;height:32px;border-radius:50%;box-shadow:inset 0 -4px 6px rgba(0,0,0,.15);}
+  .swatch .none-x{font-size:22px;color:#c99;}
+  .shop-hint{text-align:center;font-size:13px;color:#8a7d6f;margin:4px 0 8px;}
+
+  /* ---- CAFE ---- */
+  .table{position:absolute;cursor:default;}
+  .cup{cursor:pointer;}
+  .cup.sip{animation:sip .5s ease;}
+  @keyframes sip{ 30%{transform:rotate(-18deg) translateY(-2px);} }
+  .steam{position:absolute;opacity:0;font-size:20px;}
+  .steam.show{animation:steam 1.4s ease forwards;}
+  @keyframes steam{ 0%{opacity:0;transform:translateY(0);} 30%{opacity:.8;} 100%{opacity:0;transform:translateY(-30px);} }
+
+  /* ---- PLAYGROUND ---- */
+  .decor-tray{position:absolute;top:66px;left:14px;background:rgba(255,255,255,.9);border-radius:18px;
+    padding:8px;display:flex;gap:8px;z-index:20;box-shadow:0 4px 10px rgba(0,0,0,.1);}
+  .decor-item{width:48px;height:48px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;box-shadow:0 2px 0 rgba(0,0,0,.08);cursor:grab;}
+  .festive-tree{position:absolute;cursor:pointer;}
+  .light-dot{transition:fill .2s, opacity .2s;}
+  .light-dot.on{animation:twinkle 1.2s infinite ease-in-out;}
+  @keyframes twinkle{ 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  .swing{position:absolute;cursor:pointer;transform-origin:top center;}
+  .swing.swinging{animation:swingMove 1.2s ease-in-out infinite;}
+  @keyframes swingMove{ 0%,100%{transform:rotate(-8deg);} 50%{transform:rotate(8deg);} }
+
+  /* ---- room items (50+ movable objects per room) ---- */
+  .items-layer{position:absolute;inset:0;z-index:8;pointer-events:none;}
+  .room-item{position:absolute;font-size:30px;line-height:1;cursor:grab;pointer-events:auto;
+    transform:translate(-50%,-50%);touch-action:none;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.18));transition:filter .12s;}
+  .room-item.dragging{cursor:grabbing;filter:drop-shadow(0 8px 10px rgba(0,0,0,.32));transform:translate(-50%,-50%) scale(1.25);}
+  .reset-room-btn{position:absolute;top:66px;left:14px;z-index:20;}
+
+  /* ---- right-side item shelf (organized, choose & place) ---- */
+  .item-shelf{position:absolute;top:0;bottom:0;right:0;width:140px;
+    background:rgba(255,250,243,.95);border-left:5px solid #f0d9c2;
+    box-shadow:-6px 0 18px rgba(0,0,0,.1);z-index:22;
+    display:flex;flex-direction:column;padding:64px 8px 12px;}
+  .item-shelf h4{margin:0 0 8px;text-align:center;font-size:14px;color:#8a5a34;
+    background:#fff;border-radius:999px;padding:4px 8px;box-shadow:0 2px 6px rgba(0,0,0,.08);}
+  .shelf-scroll{overflow-y:auto;flex:1;display:grid;grid-template-columns:repeat(2,1fr);
+    gap:8px;padding-bottom:16px;align-content:start;}
+  .shelf-item{aspect-ratio:1;background:#fff;border-radius:14px;display:flex;align-items:center;
+    justify-content:center;font-size:22px;box-shadow:0 3px 0 rgba(0,0,0,.1);
+    border:3px solid #eee0d0;cursor:grab;transition:transform .1s;}
+  .shelf-item:active{transform:scale(.92);}
+  .shelf-item.placed{border-color:var(--pink);background:#ffeef4;}
+  .shelf-item{position:relative;}
+  .shelf-badge{position:absolute;top:-6px;left:-6px;background:var(--pink);color:#fff;font-size:11px;
+    font-weight:800;min-width:18px;height:18px;border-radius:999px;display:flex;align-items:center;
+    justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,.2);padding:0 3px;}
+  .shelf-hint{font-size:10px;color:#9a8b7c;text-align:center;margin-top:6px;line-height:1.4;}
+
+  /* ---- cocoa mini-activity (Pazu-style guided steps) ---- */
+  .cocoa-panel{position:absolute;top:112px;left:50%;transform:translateX(-50%);background:#fff;
+    border-radius:20px;padding:16px 22px;box-shadow:0 10px 24px rgba(0,0,0,.2);z-index:30;
+    text-align:center;border:3px solid #f0d9c2;}
+  .cocoa-panel h4{margin:0 0 12px;font-size:16px;color:#8a5a34;}
+  .cocoa-steps{display:flex;gap:12px;justify-content:center;}
+  .cocoa-step-btn{width:58px;height:58px;border-radius:16px;background:#fff8f0;font-size:26px;
+    display:flex;align-items:center;justify-content:center;border:3px solid #eee0d0;cursor:pointer;
+    box-shadow:0 3px 0 rgba(0,0,0,.08);}
+  .cocoa-step-btn.done{border-color:#7ecb9a;background:#eafff1;}
+  .cocoa-step-btn.next{border-color:var(--pink);animation:cocoaPulse 1s infinite;}
+  @keyframes cocoaPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+  @media (max-width:520px){
+    .item-shelf{width:104px;padding:58px 6px 8px;}
+    .shelf-item{font-size:18px;border-radius:10px;}
+    .item-shelf h4{font-size:11px;}
+  }
+
+  .toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:#4a4038cc;color:#fff;
+    padding:8px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;z-index:40;}
+  .toast.show{opacity:1;}
+
+  @media (max-width:520px){
+    .title-card h1{font-size:32px;}
+    .select-row{gap:16px;}
+    .char-card{width:130px;padding:12px 10px 16px;}
+    .char-card svg{width:90px;height:120px;}
+    #character{width:76px;height:104px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ START SCREEN ============ -->
+  <div class="screen active" id="screen-start">
+    <div class="title-hill"></div>
+    <div class="title-tree t1">🌲</div>
+    <div class="title-card">
+      <h1>❄️ עיירת השלג הקטנה ❄️</h1>
+      <p>עולם קטן, חמוד ומושלג לשחק בו</p>
+      <button class="btn pink" onclick="goToSelect()">▶ בואו נשחק</button>
+    </div>
+  </div>
+
+  <!-- ============ CHARACTER SELECT ============ -->
+  <div class="screen" id="screen-select">
+    <div class="select-title">בחרו דמות לשחק בה</div>
+    <div class="select-row">
+      <div class="char-card" id="card-mia" onclick="chooseCharacter('mia')">
+        <div id="cardPreview-mia"></div>
+        <div class="name">מיה</div>
+      </div>
+      <div class="char-card" id="card-leo" onclick="chooseCharacter('leo')">
+        <div id="cardPreview-leo"></div>
+        <div class="name">לאו</div>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:26px;" onclick="startGame()">התחילו לשחק 🎮</button>
+  </div>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <div class="screen" id="screen-game">
+    <div id="topbar">
+      <button class="btn small" id="menuBtn" onclick="backToMenu()">☰ תפריט</button>
+      <div id="areaLabel">רחוב העיירה</div>
+    </div>
+
+    <div class="stage" id="stage">
+
+      <!-- ---------- STREET ---------- -->
+      <div class="scene active" data-scene="street" id="scene-street">
+        <div class="sky"></div>
+        <div class="sun"></div>
+        <div class="cloud" style="width:90px;height:30px;top:60px;left:20%;"></div>
+        <div class="cloud" style="width:60px;height:22px;top:100px;left:55%;"></div>
+        <div class="ground"></div>
+
+        <div class="pine" style="left:4%;" onclick="shakeTree(this)">
+          <div class="cap"></div><div class="tri"></div><div class="tri"></div><div class="tri"></div><div class="trunk"></div>
+        </div>
+        <div class="pine" style="right:4%;transform:scale(1.2);" onclick="shakeTree(this)">
+          <div class="cap"></div><div class="tri"></div><div class="tri"></div><div class="tri"></div><div class="trunk"></div>
+        </div>
+
+        <div class="building" style="left:8%;" onclick="enterFrom(this,'house')">
+          <div class="roof" style="border-left:55px solid transparent;border-right:55px solid transparent;border-bottom:44px solid #d97a6c;"></div>
+          <div class="wall" style="width:110px;height:80px;background:#fff2df;">
+            <div class="win" style="width:22px;height:22px;top:12px;left:12px;"></div>
+            <div class="win" style="width:22px;height:22px;top:12px;right:12px;"></div>
+            <div class="door" style="width:30px;height:42px;background:#a9673f;"></div>
+          </div>
+          <div class="label">🏠 הבית</div>
+        </div>
+
+        <div class="building" style="left:38%;" onclick="enterFrom(this,'cafe')">
+          <div class="roof" style="border-left:50px solid transparent;border-right:50px solid transparent;border-bottom:40px solid #8a5a34;"></div>
+          <div class="wall" style="width:100px;height:72px;background:#ffe3ea;">
+            <div class="win" style="width:20px;height:20px;top:10px;left:10px;"></div>
+            <div class="win" style="width:20px;height:20px;top:10px;right:10px;"></div>
+            <div class="door" style="width:28px;height:38px;background:#c96b8a;"></div>
+          </div>
+          <div class="label">☕ בית קפה</div>
+        </div>
+
+        <div class="building" style="left:66%;" onclick="enterFrom(this,'shop')">
+          <div class="roof" style="border-left:52px solid transparent;border-right:52px solid transparent;border-bottom:42px solid #5b9bd5;"></div>
+          <div class="wall" style="width:104px;height:76px;background:#eaf5ff;">
+            <div class="win" style="width:44px;height:30px;top:20px;left:50%;transform:translateX(-50%);"></div>
+          </div>
+          <div class="label">👗 חנות בגדים</div>
+        </div>
+
+        <div class="snowman-mini" style="right:10%;bottom:31%;" onclick="enterFrom(this,'playground')">
+          <svg viewBox="0 0 70 90"><ellipse cx="35" cy="72" rx="24" ry="16" fill="#fff" stroke="#dbe9f2" stroke-width="2"/>
+          <ellipse cx="35" cy="45" rx="18" ry="14" fill="#fff" stroke="#dbe9f2" stroke-width="2"/>
+          <circle cx="35" cy="22" r="13" fill="#fff" stroke="#dbe9f2" stroke-width="2"/>
+          <polygon points="35,22 48,25 35,28" fill="#e8952f"/>
+          <circle cx="30" cy="19" r="1.6" fill="#333"/><circle cx="40" cy="19" r="1.6" fill="#333"/></svg>
+          <div class="label" style="background:#fff;">⛄ פינת המשחקים</div>
+        </div>
+      </div>
+
+      <!-- ---------- HOUSE ---------- -->
+      <div class="scene" data-scene="house" id="scene-house">
+        <div class="room-bg" style="background:linear-gradient(180deg,#ffe9d6,#fff6ec 60%);">
+          <div class="floor" style="background:#c98f5c;"></div>
+          <div style="position:absolute;top:14%;left:10%;width:110px;height:80px;background:#bfe6ff;border:8px solid #fff;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,.1);">
+            <div style="position:absolute;inset:0;background:repeating-linear-gradient(120deg, transparent 0 10px, rgba(255,255,255,.5) 10px 12px);"></div>
+          </div>
+          <div style="position:absolute;bottom:30%;right:8%;width:120px;height:70px;background:#f4c9d1;border-radius:16px 16px 6px 6px;box-shadow:0 4px 0 #e0aab5;">
+            <div style="position:absolute;top:-22px;right:6px;width:40px;height:30px;background:#f4c9d1;border-radius:10px;"></div>
+          </div>
+        </div>
+        <div class="chair" style="bottom:24%;left:35%;" onclick="toggleSit(this,35,60)">
+          <svg viewBox="0 0 70 70"><rect x="16" y="26" width="38" height="8" rx="3" fill="#b97a4a"/>
+          <rect x="16" y="26" width="8" height="34" rx="3" fill="#a5673d"/>
+          <rect x="46" y="26" width="8" height="34" rx="3" fill="#a5673d"/>
+          <rect x="20" y="6" width="30" height="26" rx="6" fill="#c98750"/></svg>
+        </div>
+        <div class="back-arrow" onclick="goToScene('street')">↩ חזרה לרחוב</div>
+        <button class="btn small reset-room-btn" onclick="resetRoom('house')">🗑️ נקה חדר</button>
+      </div>
+
+      <!-- ---------- CAFE ---------- -->
+      <div class="scene" data-scene="cafe" id="scene-cafe">
+        <div class="room-bg" style="background:linear-gradient(180deg,#ffe0ea,#fff8fa 60%);">
+          <div class="floor" style="background:#e8c9a0;"></div>
+          <div style="position:absolute;top:10%;left:0;right:0;height:26px;background:repeating-linear-gradient(90deg,#ffd166 0 30px, transparent 30px 60px);opacity:.8;"></div>
+        </div>
+        <div class="table" style="bottom:26%;left:38%;">
+          <svg viewBox="0 0 120 90" width="150" height="112"><ellipse cx="60" cy="70" rx="46" ry="10" fill="#c98750"/>
+          <rect x="52" y="70" width="16" height="16" fill="#a5673d"/>
+          <g class="cup" onclick="sipCup(this)"><rect x="42" y="46" width="26" height="20" rx="4" fill="#fff" stroke="#e0c9b0" stroke-width="2"/>
+          <path d="M68 50 q12 2 0 12" fill="none" stroke="#e0c9b0" stroke-width="3"/></g>
+        </svg>
+        <div class="steam" id="cafeSteam" style="top:20px;left:60px;">〰️〰️</div>
+        </div>
+        <div class="chair" style="bottom:24%;right:28%;" onclick="toggleSit(this,32,58)">
+          <svg viewBox="0 0 70 70"><rect x="16" y="26" width="38" height="8" rx="3" fill="#e0879a"/>
+          <rect x="16" y="26" width="8" height="34" rx="3" fill="#c96b8a"/>
+          <rect x="46" y="26" width="8" height="34" rx="3" fill="#c96b8a"/>
+          <rect x="20" y="6" width="30" height="26" rx="6" fill="#f0a6b8"/></svg>
+        </div>
+        <div class="back-arrow" onclick="goToScene('street')">↩ חזרה לרחוב</div>
+        <button class="btn small reset-room-btn" onclick="resetRoom('cafe')">🗑️ נקה חדר</button>
+        <button class="btn small" style="position:absolute;top:66px;left:50%;transform:translateX(-50%);z-index:20;" onclick="startCocoa()">🍫 הכינו שוקו חם</button>
+        <div id="cocoaPanel" class="cocoa-panel" style="display:none;"></div>
+      </div>
+
+      <!-- ---------- SHOP ---------- -->
+      <div class="scene" data-scene="shop" id="scene-shop">
+        <div class="shop-bg"></div>
+        <div class="back-arrow" onclick="goToScene('street')">↩ חזרה לרחוב</div>
+        <div class="shop-hint" style="position:absolute;top:66px;left:14px;">גררו או לחצו על פריט כדי להלביש 👗</div>
+        <div id="shopPanel"></div>
+      </div>
+
+      <!-- ---------- PLAYGROUND ---------- -->
+      <div class="scene" data-scene="playground" id="scene-playground">
+        <div class="room-bg" style="background:linear-gradient(180deg,#cfeaff,#ffffff 70%);">
+          <div class="floor" style="background:#ffffff;box-shadow:0 -4px 0 var(--snow-shadow) inset;"></div>
+        </div>
+        <div class="decor-tray">
+          <div class="decor-item" draggable="true" title="כובע" ondragstart="dragDecor(event,'hat')" onclick="setSnowman('hat',true)">🎩</div>
+          <div class="decor-item" draggable="true" title="צעיף" ondragstart="dragDecor(event,'scarf')" onclick="setSnowman('scarf',true)">🧣</div>
+          <div class="decor-item" draggable="true" title="כפתורים" ondragstart="dragDecor(event,'buttons')" onclick="setSnowman('buttons',true)">⚫</div>
+          <div class="decor-item" draggable="true" title="אף גזר" ondragstart="dragDecor(event,'nose')" onclick="setSnowman('nose',true)">🥕</div>
+        </div>
+        <div id="snowmanBig" style="position:absolute;bottom:26%;left:12%;cursor:pointer;"
+             ondragover="event.preventDefault()" ondrop="dropDecor(event)"></div>
+        <div class="festive-tree" style="bottom:24%;right:14%;" onclick="cycleTree()">
+          <svg id="festiveTreeSvg" viewBox="0 0 100 140" width="130" height="180"></svg>
+        </div>
+        <div class="swing" id="swingEl" style="top:22%;left:52%;cursor:pointer;" onclick="toggleSwing()">
+          <svg viewBox="0 0 90 100" width="90" height="100">
+            <line x1="20" y1="0" x2="20" y2="60" stroke="#8a5a34" stroke-width="4"/>
+            <line x1="70" y1="0" x2="70" y2="60" stroke="#8a5a34" stroke-width="4"/>
+            <rect x="14" y="60" width="62" height="10" rx="4" fill="#c98750"/>
+          </svg>
+        </div>
+        <div class="back-arrow" onclick="goToScene('street')">↩ חזרה לרחוב</div>
+        <button class="btn small reset-room-btn" onclick="resetRoom('playground')">🗑️ נקה חדר</button>
+      </div>
+
+      <!-- draggable character lives here, gets moved between scenes -->
+      <div id="character">
+        <div class="shadow"></div>
+      </div>
+
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div id="navbar">
+      <button class="navbtn" data-scene="street" onclick="goToScene('street')" title="רחוב">🏘️</button>
+      <button class="navbtn" data-scene="house" onclick="goToScene('house')" title="בית">🏠</button>
+      <button class="navbtn" data-scene="cafe" onclick="goToScene('cafe')" title="בית קפה">☕</button>
+      <button class="navbtn" data-scene="shop" onclick="goToScene('shop')" title="חנות">👗</button>
+      <button class="navbtn" data-scene="playground" onclick="goToScene('playground')" title="משחקים">⛄</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   SNOW TOWN — a tiny original dollhouse-style winter game
+   ========================================================= */
+
+/* ---------- clothing catalogue ---------- */
+const CATS = {
+  coat:   [ {id:'classic', label:'קלאסי', main:'#fdf6ec', trim:'#c9a27a'},
+            {id:'pink',    label:'ורוד',  main:'#ffc6d9', trim:'#ff8fb3'},
+            {id:'blue',    label:'תכלת',  main:'#bfe3ff', trim:'#6fb3e0'},
+            {id:'mint',    label:'מנטה',  main:'#c9f2df', trim:'#6fcf9e'} ],
+  hat:    [ {id:'none',  label:'בלי כובע'},
+            {id:'cream', label:'קרם',  color:'#fdf1df'},
+            {id:'brown', label:'חום',  color:'#8a5a34'},
+            {id:'red',   label:'אדום', color:'#d94f4f'},
+            {id:'purple',label:'סגול', color:'#8e6bfa'} ],
+  scarf:  [ {id:'none',  label:'בלי צעיף'},
+            {id:'white', label:'לבן',  color:'#ffffff'},
+            {id:'red',   label:'אדום', color:'#d94f4f'},
+            {id:'yellow',label:'צהוב', color:'#f2c14e'},
+            {id:'purple',label:'סגול', color:'#8e6bfa'} ],
+  boots:  [ {id:'brown', label:'חום',  color:'#7a4b2a'},
+            {id:'red',   label:'אדום', color:'#c0392b'},
+            {id:'purple',label:'סגול', color:'#6c4a8e'} ],
+  gloves: [ {id:'none',  label:'בלי כפפות'},
+            {id:'brown', label:'חום',  color:'#7a4b2a'},
+            {id:'white', label:'לבן',  color:'#ffffff'} ]
+};
+const CAT_LABELS = {coat:'מעיל', hat:'כובע', scarf:'צעיף', boots:'מגפיים', gloves:'כפפות'};
+
+function findOpt(cat, id){ return CATS[cat].find(o=>o.id===id) || CATS[cat][0]; }
+
+/* ---------- game state (in-memory, kept for whole session) ---------- */
+const state = {
+  character: null,
+  scene: 'street',
+  sittingChair: null,
+  snowman: {hat:false, scarf:false, buttons:false, nose:false},
+  treeLevel: 0, // 0 off, 1 warm, 2 rainbow
+  swinging:false,
+  itemPos: { house:{}, cafe:{}, playground:{} },
+  itemCounter: { house:0, cafe:0, playground:0 },
+  cocoa: { active:false, step:0 },
+  wearByChar: {
+    mia: {coat:'classic', hat:'cream', scarf:'white', boots:'brown', gloves:'none'},
+    leo: {coat:'classic', hat:'brown', scarf:'red',   boots:'brown', gloves:'none'}
+  }
+};
+
+/* ---------- room item catalogue (50+ movable objects per room) ---------- */
+const ITEM_CATALOG = {
+  house: ['🛋️','🪑','🛏️','🪟','🖼️','🕯️','🧸','🪆','📚','📖','🔔','🧦','🕰️','💡','🪴','🔥','🧺','🧣','🧤',
+          '🎁','🪅','🧵','🧶','🪡','🐻','🐰','🐱','🐶','🦉','🍎','🍊','🍋','🍇','🥛','🍪','🧃','🎈','🎀',
+          '✂️','📏','🖍️','🎨','🧩','🪀','🎲','♟️','🃏','🔑','🪞','🎻','🥁','🎹','🖇️','🪔',
+          '🗄️','🍽️','📺','🛁','🚿','🪟','🧸'],
+  cafe:  ['☕','🫖','🧋','🍵','🧉','🥤','🍰','🧁','🍪','🍩','🥐','🥯','🍞','🥖','🧇','🥞','🍯','🍫','🍬',
+          '🍭','🍮','🍨','🍦','🧊','🥛','🍓','🍒','🍇','🍎','🍊','🍋','🥧','🎂','🍡','🍢','🍿','🧀','🥨',
+          '🌰','🫙','🕯️','🌸','🌷','🪴','🖼️','🪑','🧺','📖','🎶','🍋','🍯','🥄','🍽️','🫗','🧁','🍩',
+          '🛋️','🗄️','🍽️'],
+  playground: ['⛄','❄️','🎿','🛷','⛸️','🏂','🎪','🎈','🎏','🪁','⚽','🎯','🧸','🎨','🪀','🎲','🥅','🏒',
+          '🧣','🧤','🎳','🎠','🎡','🎢','🪂','🌨️','🌬️','☃️','🐧','🦌','🐿️','🦊','🐇','🌟','⭐','✨',
+          '🎇','🎆','🪄','🎁','🎀','🧦','🥌','🏑','🏓','🏸','🥏','🪅','🎐','🧊','🎋','🪁']
+};
+
+/* proportional sizes (px) so a sled looks bigger than a snowflake, etc. */
+const SIZE_TABLE = {
+  '❄️':16,'✨':16,'⭐':18,'🌟':20,'🍒':18,'🍓':20,'🍇':20,'🍯':22,'🍬':18,'🍭':22,'🧊':18,'🔔':22,'🔑':18,
+  '🥄':18,'🧵':18,'🪡':16,'✂️':22,'📏':22,
+  '🍎':24,'🍊':24,'🍋':24,'🍪':24,'🍩':26,'🥐':26,'🥯':26,'🍞':26,'🥖':28,'🧇':26,'🥞':26,'🍫':22,
+  '🍨':26,'🍦':28,'🥛':26,'🍮':24,'🍡':22,'🍢':24,'🍿':26,'🧀':24,'🥨':24,'🌰':20,'🫙':24,'🧣':24,
+  '🧤':24,'🎀':22,'🎈':26,'🎏':28,'🪁':30,'⚽':26,'🎯':26,'🪀':22,'🎲':22,'♟️':20,'🃏':24,'🖇️':18,
+  '🔥':24,'💡':24,'🧦':22,'🕯️':22,
+  '☕':30,'🫖':32,'🧋':30,'🍵':28,'🧉':28,'🥤':28,'🍰':32,'🧁':30,'🎂':34,'🥧':30,
+  '🌸':26,'🌷':26,'🪴':34,'🖼️':40,'🪞':38,'📖':28,'📚':32,'🎨':30,'🧩':28,'🐻':32,'🐰':30,
+  '🐱':30,'🐶':30,'🦉':30,'🐧':32,'🦌':34,'🐿️':26,'🦊':30,'🐇':30,'🧸':32,'🎻':32,'🥁':32,'🎹':40,
+  '🕰️':32,'🪔':26,'🧺':32,'🪆':30,'🎁':32,'🪅':32,'🥌':26,'🏑':32,'🏓':30,'🏸':30,'🥏':28,
+  '🎐':28,'🥅':40,'🏒':32,'🎳':32,'🌨️':30,'🌬️':30,'🎇':28,'🎆':32,'🪄':28,'🎶':26,'🫗':26,
+  '🛋️':84,'🛏️':78,'🗄️':72,'📺':64,'🪟':56,'🛁':72,'🚿':52,'⛄':64,'☃️':64,'🎪':78,'🎠':86,'🎡':92,
+  '🎢':92,'🛷':66,'🎿':56,'⛸️':34,'🏂':48,'🪂':56,'🍽️':46,'🪑':40
+};
+function iconSize(icon){ return SIZE_TABLE[icon] || 30; }
+
+function hashSeed(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; }
+  return h;
+}
+function seededRandom(seed){
+  // simple deterministic pseudo-random 0..1 from an integer seed
+  let x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+function defaultItemPos(id){
+  const h = hashSeed(id);
+  const rx = seededRandom(h);
+  const ry = seededRandom(h + 99991);
+  return { x: 6 + rx * 86, y: 36 + ry * 54 };
+}
+
+
+/* ---------- character SVG builder ---------- */
+function characterSVG(charId){
+  const cid = (charId === 'mia' || charId === 'leo') ? charId : 'mia';
+  const wear = state.wearByChar[cid];
+  const isMia = cid === 'mia';
+  const skin = '#ffe0c2';
+  const hair = '#6b4226';
+  const ink = 'rgba(60,45,30,0.28)';
+  const coat = findOpt('coat', wear.coat);
+  const hat  = findOpt('hat', wear.hat);
+  const scarf= findOpt('scarf', wear.scarf);
+  const boots= findOpt('boots', wear.boots);
+  const gloves=findOpt('gloves', wear.gloves);
+
+  return `<svg viewBox="0 0 160 220">
+    <!-- legs -->
+    <rect x="58" y="160" width="17" height="26" rx="8" fill="#5b7fa6" stroke="${ink}" stroke-width="3"/>
+    <rect x="85" y="160" width="17" height="26" rx="8" fill="#5b7fa6" stroke="${ink}" stroke-width="3"/>
+    <!-- chunky boots -->
+    <ellipse cx="66" cy="192" rx="21" ry="15" fill="${boots.color}" stroke="${ink}" stroke-width="3"/>
+    <ellipse cx="94" cy="192" rx="21" ry="15" fill="${boots.color}" stroke="${ink}" stroke-width="3"/>
+    <!-- arms -->
+    <rect x="16" y="118" width="25" height="46" rx="12" fill="${coat.main}" stroke="${ink}" stroke-width="3"/>
+    <rect x="119" y="118" width="25" height="46" rx="12" fill="${coat.main}" stroke="${ink}" stroke-width="3"/>
+    <!-- mitten hands -->
+    ${gloves.id!=='none'
+      ? `<circle cx="29" cy="160" r="15" fill="${gloves.color}" stroke="${ink}" stroke-width="3"/><circle cx="131" cy="160" r="15" fill="${gloves.color}" stroke="${ink}" stroke-width="3"/>`
+      : `<circle cx="29" cy="160" r="13" fill="${skin}" stroke="${ink}" stroke-width="3"/><circle cx="131" cy="160" r="13" fill="${skin}" stroke="${ink}" stroke-width="3"/>`}
+    <!-- torso / coat -->
+    <path d="M34 120 Q80 96 126 120 L130 172 Q80 192 30 172 Z" fill="${coat.main}" stroke="${ink}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M32 160 Q80 178 128 160 L126 172 Q80 190 34 172 Z" fill="${coat.trim}"/>
+    <rect x="17" y="116" width="24" height="15" rx="7" fill="${coat.trim}"/>
+    <rect x="119" y="116" width="24" height="15" rx="7" fill="${coat.trim}"/>
+    <!-- scarf -->
+    ${scarf.id!=='none' ? `<rect x="50" y="96" width="60" height="18" rx="9" fill="${scarf.color}" stroke="${ink}" stroke-width="2.5"/><rect x="56" y="106" width="17" height="34" rx="7" fill="${scarf.color}" stroke="${ink}" stroke-width="2.5"/>` : ``}
+    <!-- neck -->
+    <rect x="68" y="88" width="24" height="18" fill="${skin}"/>
+    <!-- head (big & chibi) -->
+    <circle cx="80" cy="58" r="46" fill="${skin}" stroke="rgba(180,120,70,0.35)" stroke-width="3"/>
+    <!-- hair -->
+    ${isMia ? `<path d="M34 50 Q26 112 47 133 Q55 96 57 58 Z" fill="${hair}"/><path d="M126 50 Q134 112 113 133 Q105 96 103 58 Z" fill="${hair}"/>` : ``}
+    <path d="M34 56 Q40 6 80 6 Q120 6 126 56 Q107 34 80 34 Q53 34 34 56 Z" fill="${hair}" stroke="${ink}" stroke-width="2"/>
+    ${!isMia ? `<path d="M40 44 Q46 25 80 25 Q114 25 120 44 Q116 31 80 31 Q44 31 40 44 Z" fill="${hair}"/>` : ``}
+    <!-- cheeks -->
+    <circle cx="57" cy="68" r="9" fill="#ffb3ab" opacity="0.6"/>
+    <circle cx="103" cy="68" r="9" fill="#ffb3ab" opacity="0.6"/>
+    <!-- big friendly eyes -->
+    <ellipse cx="64" cy="56" rx="6.2" ry="8.4" fill="#2e2620"/>
+    <ellipse cx="96" cy="56" rx="6.2" ry="8.4" fill="#2e2620"/>
+    <circle cx="66.5" cy="52" r="2.1" fill="#fff"/>
+    <circle cx="98.5" cy="52" r="2.1" fill="#fff"/>
+    <!-- smile -->
+    <path d="M63 76 Q80 90 97 76" stroke="#c56a4f" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- hat -->
+    ${hat.id!=='none' ? `<path d="M30 50 Q80 2 130 50 Q130 32 80 24 Q30 32 30 50 Z" fill="${hat.color}" stroke="${ink}" stroke-width="2.5"/><rect x="30" y="42" width="100" height="15" rx="7" fill="${hat.color}" stroke="${ink}" stroke-width="2.5"/><circle cx="80" cy="14" r="10" fill="#fff" stroke="${ink}" stroke-width="2"/>` : ``}
+  </svg>`;
+}
+
+function renderCharacter(){
+  const el = document.getElementById('character');
+  el.innerHTML = `<div class="shadow"></div>` + characterSVG(state.character);
+  document.getElementById('cardPreview-mia').innerHTML = characterSVG('mia');
+  document.getElementById('cardPreview-leo').innerHTML = characterSVG('leo');
+}
+
+/* ---------- screen navigation ---------- */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goToSelect(){ renderCharacter(); showScreen('screen-select'); }
+function chooseCharacter(id){
+  state.character = id;
+  document.getElementById('card-mia').classList.toggle('chosen', id==='mia');
+  document.getElementById('card-leo').classList.toggle('chosen', id==='leo');
+}
+function startGame(){
+  if(!state.character){ chooseCharacter('mia'); }
+  showScreen('screen-game');
+  buildShopPanel();
+  buildSnowman();
+  buildFestiveTree();
+  goToScene('street');
+}
+function backToMenu(){
+  showScreen('screen-start');
+}
+
+/* ---------- scene switching ---------- */
+const ENTRY_POINTS = {
+  street:     {x: '40%', y: '58%'},
+  house:      {x: '55%', y: '55%'},
+  cafe:       {x: '15%', y: '58%'},
+  shop:       {x: '50%', y: 'calc(100% - 190px)'},
+  playground: {x: '50%', y: '60%'}
+};
+function goToScene(name){
+  state.scene = name;
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  const target = document.getElementById('scene-'+name);
+  target.classList.add('active');
+  target.appendChild(document.getElementById('character'));
+
+  if(ITEM_CATALOG[name]) buildRoomItems(name);
+
+  const labels = {street:'רחוב העיירה', house:'הבית החם', cafe:'בית הקפה', shop:'חנות הבגדים', playground:'פינת המשחקים'};
+  document.getElementById('areaLabel').textContent = labels[name];
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.scene===name));
+
+  const p = ENTRY_POINTS[name];
+  const charEl = document.getElementById('character');
+  charEl.style.left = 'calc(' + p.x + ' - 48px)';
+  charEl.style.top = p.y.toString().startsWith('calc') ? p.y : 'calc(' + p.y + ' - 66px)';
+  charEl.classList.remove('sitting');
+  state.sittingChair = null;
+}
+function enterFrom(el, sceneName){
+  el.classList.add('pop');
+  setTimeout(()=>{ el.classList.remove('pop'); goToScene(sceneName); }, 180);
+}
+
+/* ---------- draggable character (pointer-based, works within any scene) ---------- */
+(function(){
+  const el = document.getElementById('character');
+  let dragging=false, offX=0, offY=0;
+  el.addEventListener('pointerdown', e=>{
+    dragging = true;
+    el.setPointerCapture(e.pointerId);
+    const r = el.getBoundingClientRect();
+    offX = e.clientX - r.left; offY = e.clientY - r.top;
+    el.classList.add('grabbing');
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const parent = el.parentElement.getBoundingClientRect();
+    let x = e.clientX - parent.left - offX;
+    let y = e.clientY - parent.top - offY;
+    x = Math.max(0, Math.min(x, parent.width - el.offsetWidth));
+    y = Math.max(0, Math.min(y, parent.height - el.offsetHeight));
+    el.style.left = x+'px'; el.style.top = y+'px';
+  });
+  function endDrag(e){
+    if(!dragging) return;
+    dragging=false; el.classList.remove('grabbing');
+    // check clothing drop in shop scene
+    if(state.scene==='shop' && window._draggedClothing){
+      applyClothing(window._draggedClothing.cat, window._draggedClothing.id);
+      window._draggedClothing = null;
+    }
+  }
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+})();
+
+/* ---------- sitting on chairs ---------- */
+function toggleSit(chairEl, xPct, yPct){
+  const stageScene = chairEl.closest('.scene');
+  const charEl = document.getElementById('character');
+  const chairId = chairEl;
+  if(state.sittingChair === chairId){
+    // stand up
+    state.sittingChair = null;
+    charEl.classList.remove('sitting');
+    goToScene(state.scene); // reset to entry point
+    return;
+  }
+  state.sittingChair = chairId;
+  const rect = stageScene.getBoundingClientRect();
+  const chairRect = chairEl.getBoundingClientRect();
+  const relX = chairRect.left - rect.left + chairRect.width*0.15;
+  const relY = chairRect.top - rect.top - 40;
+  charEl.style.left = relX + 'px';
+  charEl.style.top = relY + 'px';
+  charEl.classList.add('sitting');
+  showToast('😊 יושבים בנוחות');
+}
+
+/* ---------- street decorations ---------- */
+function shakeTree(el){
+  el.classList.add('shake');
+  setTimeout(()=>el.classList.remove('shake'), 500);
+  spawnSparkle(el);
+}
+function spawnSparkle(el){
+  const r = el.getBoundingClientRect();
+  const s = document.createElement('div');
+  s.textContent='✨';
+  s.style.position='fixed';
+  s.style.left = (r.left + r.width/2) + 'px';
+  s.style.top = r.top + 'px';
+  s.style.fontSize='20px';
+  s.style.zIndex=999;
+  s.style.pointerEvents='none';
+  s.style.transition='transform 0.8s ease, opacity 0.8s ease';
+  document.body.appendChild(s);
+  requestAnimationFrame(()=>{
+    s.style.transform='translateY(-40px)';
+    s.style.opacity='0';
+  });
+  setTimeout(()=>s.remove(), 850);
+}
+
+/* ---------- cafe ---------- */
+function sipCup(el){
+  el.classList.add('sip');
+  setTimeout(()=>el.classList.remove('sip'), 500);
+  const steam = document.getElementById('cafeSteam');
+  steam.classList.remove('show'); void steam.offsetWidth; steam.classList.add('show');
+  showToast('☕ מממ... חם וטעים!');
+}
+
+/* ---------- hot cocoa mini-activity (Pazu-style guided steps) ---------- */
+const COCOA_STEPS = [{k:'cocoa', icon:'🍫'}, {k:'milk', icon:'🥛'}, {k:'cream', icon:'🍦'}];
+function startCocoa(){
+  state.cocoa = {active:true, step:0};
+  renderCocoa();
+}
+function renderCocoa(){
+  const panel = document.getElementById('cocoaPanel');
+  if(!state.cocoa.active){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  panel.innerHTML = `<h4>הכינו שוקו חם ביחד ☕</h4><div class="cocoa-steps">` +
+    COCOA_STEPS.map((s,i)=>{
+      const cls = i < state.cocoa.step ? 'done' : (i === state.cocoa.step ? 'next' : '');
+      const content = i < state.cocoa.step ? '✅' : s.icon;
+      return `<div class="cocoa-step-btn ${cls}" onclick="cocoaClick('${s.k}')">${content}</div>`;
+    }).join('') + `</div>`;
+}
+function cocoaClick(kind){
+  const order = COCOA_STEPS.map(s=>s.k);
+  if(order[state.cocoa.step] === kind){
+    state.cocoa.step++;
+    if(state.cocoa.step >= order.length){
+      showToast('🎉 השוקו החם מוכן! בתאבון');
+      const steam = document.getElementById('cafeSteam');
+      steam.classList.remove('show'); void steam.offsetWidth; steam.classList.add('show');
+      setTimeout(()=>{ state.cocoa.active = false; renderCocoa(); }, 1600);
+      return;
+    }
+  } else {
+    showToast('נסו לפי הסדר 😊');
+  }
+  renderCocoa();
+}
+
+/* ---------- toast ---------- */
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+/* ---------- shop ---------- */
+function buildShopPanel(){
+  const panel = document.getElementById('shopPanel');
+  let html = '';
+  for(const cat of ['coat','hat','scarf','boots','gloves']){
+    html += `<div class="shop-rail"><div class="cat-title">${CAT_LABELS[cat]}</div><div class="swatch-row">`;
+    for(const opt of CATS[cat]){
+      const swatchColor = opt.main || opt.color;
+      html += `<div class="swatch" id="sw-${cat}-${opt.id}" draggable="true"
+                 ondragstart="dragClothing(event,'${cat}','${opt.id}')"
+                 onclick="applyClothing('${cat}','${opt.id}')" title="${opt.label}">
+                 ${swatchColor ? `<div class="dot" style="background:${swatchColor}"></div>` : `<span class="none-x">✕</span>`}
+               </div>`;
+    }
+    html += `</div></div>`;
+  }
+  panel.innerHTML = html;
+  refreshShopSelection();
+}
+function refreshShopSelection(){
+  if(!state.character) return;
+  const wear = state.wearByChar[state.character];
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
+  for(const cat in wear){
+    const s = document.getElementById(`sw-${cat}-${wear[cat]}`);
+    if(s) s.classList.add('selected');
+  }
+}
+function applyClothing(cat, id){
+  if(!state.character) return;
+  state.wearByChar[state.character][cat] = id;
+  renderCharacter();
+  // character may have been re-created by renderCharacter's innerHTML reset — reapply position/scene class
+  const charEl = document.getElementById('character');
+  if(document.getElementById('scene-'+state.scene).classList.contains('active') &&
+     !document.getElementById('scene-'+state.scene).contains(charEl)){
+    document.getElementById('scene-'+state.scene).appendChild(charEl);
+  }
+  refreshShopSelection();
+  showToast('✨ הלבשה בוצעה!');
+}
+function dragClothing(ev, cat, id){
+  window._draggedClothing = {cat, id};
+  ev.dataTransfer.setData('text/plain', cat+':'+id);
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  const charEl = document.getElementById('character');
+  charEl.addEventListener('dragover', e=>e.preventDefault());
+  charEl.addEventListener('drop', e=>{
+    e.preventDefault();
+    const data = e.dataTransfer.getData('text/plain');
+    if(data && data.includes(':')){
+      const [cat,id] = data.split(':');
+      applyClothing(cat,id);
+    }
+  });
+});
+
+/* ---------- snowman decoration ---------- */
+function buildSnowman(){ renderSnowman(); }
+function renderSnowman(){
+  const s = state.snowman;
+  const el = document.getElementById('snowmanBig');
+  el.innerHTML = `<svg viewBox="0 0 140 190" width="140" height="190">
+    <ellipse cx="70" cy="150" rx="48" ry="32" fill="#fff" stroke="#dbe9f2" stroke-width="3"/>
+    <ellipse cx="70" cy="95" rx="36" ry="28" fill="#fff" stroke="#dbe9f2" stroke-width="3"/>
+    <circle cx="70" cy="45" r="26" fill="#fff" stroke="#dbe9f2" stroke-width="3"/>
+    ${s.nose ? `<polygon points="70,45 96,50 70,56" fill="#e8952f" style="cursor:pointer" onclick="setSnowman('nose',false)"/>` : `<polygon points="70,45 84,47 70,50" fill="#e8952f" opacity="0.001"/>`}
+    <circle cx="61" cy="40" r="3" fill="#333"/><circle cx="79" cy="40" r="3" fill="#333"/>
+    <path d="M60 55 Q70 60 80 55" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/>
+    ${s.buttons ? `<g style="cursor:pointer" onclick="setSnowman('buttons',false)">
+        <circle cx="70" cy="90" r="4" fill="#333"/><circle cx="70" cy="105" r="4" fill="#333"/><circle cx="70" cy="120" r="4" fill="#333"/>
+      </g>` : ``}
+    ${s.scarf ? `<g style="cursor:pointer" onclick="setSnowman('scarf',false)">
+        <rect x="48" y="65" width="44" height="14" rx="6" fill="#d94f4f"/><rect x="52" y="75" width="12" height="26" rx="5" fill="#d94f4f"/>
+      </g>` : ``}
+    ${s.hat ? `<g style="cursor:pointer" onclick="setSnowman('hat',false)">
+        <rect x="46" y="8" width="48" height="10" rx="4" fill="#4a4038"/><rect x="54" y="-16" width="32" height="28" fill="#4a4038"/>
+      </g>` : ``}
+  </svg>`;
+  el.ondragover = e=>e.preventDefault();
+  el.ondrop = dropDecor;
+}
+function setSnowman(part, val){
+  state.snowman[part] = val;
+  renderSnowman();
+  if(val) showToast('⛄ קישוט נוסף!');
+}
+function dragDecor(ev, part){
+  ev.dataTransfer.setData('text/plain', 'decor:'+part);
+}
+function dropDecor(ev){
+  ev.preventDefault();
+  const data = ev.dataTransfer.getData('text/plain');
+  if(data && data.startsWith('decor:')){
+    const part = data.split(':')[1];
+    setSnowman(part, true);
+  }
+}
+
+/* ---------- festive tree lights ---------- */
+function buildFestiveTree(){ renderFestiveTree(); }
+function renderFestiveTree(){
+  const svg = document.getElementById('festiveTreeSvg');
+  const lvl = state.treeLevel;
+  const rainbow = ['#ff6b6b','#ffd166','#4fd1a5','#5b9bd5','#c98fe0'];
+  let lights = '';
+  const positions = [[50,40],[35,60],[65,60],[30,85],[70,85],[50,105],[35,120],[65,120]];
+  positions.forEach((p,i)=>{
+    let color = '#ddd';
+    let on = false;
+    if(lvl===1){ color = '#ffd166'; on = true; }
+    if(lvl===2){ color = rainbow[i % rainbow.length]; on = true; }
+    lights += `<circle class="light-dot ${on?'on':''}" cx="${p[0]}" cy="${p[1]}" r="4" fill="${color}"/>`;
+  });
+  svg.innerHTML = `
+    <polygon points="50,10 20,60 80,60" fill="#4f8f6b"/>
+    <polygon points="50,45 15,95 85,95" fill="#427b5c"/>
+    <polygon points="50,80 10,135 90,135" fill="#396b4f"/>
+    <rect x="42" y="135" width="16" height="18" fill="#7a5636"/>
+    <polygon points="50,0 44,12 56,12" fill="#f2c14e"/>
+    ${lights}
+  `;
+}
+function cycleTree(){
+  state.treeLevel = (state.treeLevel + 1) % 3;
+  renderFestiveTree();
+  const msgs = ['🌲 העץ כבוי','✨ העץ נדלק!','🌈 עכשיו בצבעים!'];
+  showToast(msgs[state.treeLevel]);
+}
+
+/* ---------- swing ---------- */
+function toggleSwing(){
+  state.swinging = !state.swinging;
+  document.getElementById('swingEl').classList.toggle('swinging', state.swinging);
+}
+
+/* ---------- room items: organized right-side shelf, choose & place (multiple copies allowed) ---------- */
+function ensureItemsLayer(room){
+  const scene = document.getElementById('scene-'+room);
+  let layer = scene.querySelector('.items-layer');
+  if(!layer){
+    layer = document.createElement('div');
+    layer.className = 'items-layer';
+    scene.appendChild(layer);
+  }
+  if(!scene.dataset.dndBound){
+    scene.addEventListener('dragover', e=>e.preventDefault());
+    scene.addEventListener('drop', e=>{
+      e.preventDefault();
+      const data = e.dataTransfer.getData('text/plain');
+      if(data && data.startsWith('shelf:')){
+        const parts = data.split(':');
+        const r = parts[1], idx = parseInt(parts[2], 10);
+        const rect = layer.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width * 100;
+        const y = (e.clientY - rect.top) / rect.height * 100;
+        placeItem(r, idx, x, y);
+      }
+    });
+    scene.dataset.dndBound = '1';
+  }
+  return layer;
+}
+function ensureShelf(room){
+  const scene = document.getElementById('scene-'+room);
+  let shelf = scene.querySelector('.item-shelf');
+  if(!shelf){
+    shelf = document.createElement('div');
+    shelf.className = 'item-shelf';
+    shelf.innerHTML = `<h4>🧺 פריטים</h4><div class="shelf-scroll"></div><div class="shelf-hint">גררו/לחצו כדי להוסיף · לחיצה על פריט בחדר מסירה אותו</div>`;
+    scene.appendChild(shelf);
+  }
+  return shelf;
+}
+function renderRoomItems(room){
+  const layer = ensureItemsLayer(room);
+  layer.innerHTML = '';
+  const icons = ITEM_CATALOG[room];
+  const placed = state.itemPos[room];
+  Object.keys(placed).forEach(instId=>{
+    const rec = placed[instId];
+    const icon = icons[rec.idx];
+    const el = document.createElement('div');
+    el.className = 'room-item';
+    el.style.left = rec.x + '%';
+    el.style.top = rec.y + '%';
+    el.style.fontSize = iconSize(icon) + 'px';
+    el.textContent = icon;
+    layer.appendChild(el);
+    makeItemDraggable(el, room, instId);
+  });
+}
+function countPlaced(room, idx){
+  const placed = state.itemPos[room];
+  let n = 0;
+  for(const k in placed){ if(placed[k].idx === idx) n++; }
+  return n;
+}
+function renderShelf(room){
+  const shelf = ensureShelf(room);
+  const scroll = shelf.querySelector('.shelf-scroll');
+  scroll.innerHTML = '';
+  ITEM_CATALOG[room].forEach((icon, idx)=>{
+    const count = countPlaced(room, idx);
+    const btn = document.createElement('div');
+    btn.className = 'shelf-item' + (count > 0 ? ' placed' : '');
+    btn.textContent = icon;
+    btn.style.fontSize = Math.max(16, Math.min(30, 14 + iconSize(icon)*0.22)) + 'px';
+    btn.draggable = true;
+    if(count > 0){
+      const badge = document.createElement('span');
+      badge.className = 'shelf-badge';
+      badge.textContent = count;
+      btn.appendChild(badge);
+    }
+    btn.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', 'shelf:'+room+':'+idx); });
+    btn.addEventListener('click', ()=> placeItem(room, idx));
+    scroll.appendChild(btn);
+  });
+}
+function buildRoomItems(room){
+  ensureItemsLayer(room);
+  ensureShelf(room);
+  renderRoomItems(room);
+  renderShelf(room);
+}
+function placeItem(room, idx, x, y){
+  const counter = ++state.itemCounter[room];
+  const instId = room + '-' + idx + '-i' + counter;
+  if(x===undefined || y===undefined){ const p = defaultItemPos(instId); x = p.x; y = p.y; }
+  x = Math.max(4, Math.min(94, x));
+  y = Math.max(6, Math.min(92, y));
+  state.itemPos[room][instId] = {idx, x, y};
+  renderRoomItems(room);
+  renderShelf(room);
+  showToast('✨ פריט נוסף!');
+}
+function removeItem(room, instId){
+  delete state.itemPos[room][instId];
+  renderRoomItems(room);
+  renderShelf(room);
+}
+function makeItemDraggable(el, room, instId){
+  let dragging = false, offX = 0, offY = 0, moved = false, startX = 0, startY = 0;
+  el.addEventListener('pointerdown', e=>{
+    dragging = true; moved = false;
+    el.setPointerCapture(e.pointerId);
+    const r = el.getBoundingClientRect();
+    offX = e.clientX - (r.left + r.width/2);
+    offY = e.clientY - (r.top + r.height/2);
+    startX = e.clientX; startY = e.clientY;
+    e.stopPropagation();
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    if(Math.abs(e.clientX-startX) > 5 || Math.abs(e.clientY-startY) > 5){
+      moved = true;
+      el.classList.add('dragging');
+    }
+    if(!moved) return;
+    const parent = el.parentElement.getBoundingClientRect();
+    let x = e.clientX - parent.left - offX;
+    let y = e.clientY - parent.top - offY;
+    x = Math.max(0, Math.min(x, parent.width));
+    y = Math.max(0, Math.min(y, parent.height));
+    el.style.left = (x/parent.width*100) + '%';
+    el.style.top = (y/parent.height*100) + '%';
+  });
+  function end(){
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    if(moved){
+      state.itemPos[room][instId] = { ...state.itemPos[room][instId], x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    } else {
+      removeItem(room, instId);
+    }
+  }
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+function resetRoom(room){
+  state.itemPos[room] = {};
+  renderRoomItems(room);
+  renderShelf(room);
+  showToast('🗑️ החדר נוקה!');
+}
+
+/* ---------- falling snow ---------- */
+function buildSnow(){
+  const layer = document.createElement('div');
+  layer.id = 'snowLayer';
+  document.getElementById('app').appendChild(layer);
+  const count = window.innerWidth < 600 ? 22 : 40;
+  for(let i=0;i<count;i++){
+    const f = document.createElement('div');
+    f.className='flake';
+    const size = 3 + Math.random()*6;
+    f.style.width = size+'px';
+    f.style.height = size+'px';
+    f.style.left = Math.random()*100+'%';
+    const dur = 8 + Math.random()*10;
+    const swayDur = 3 + Math.random()*3;
+    f.style.animationDuration = dur+'s, '+swayDur+'s';
+    f.style.animationDelay = (-Math.random()*dur)+'s, '+(-Math.random()*swayDur)+'s';
+    layer.appendChild(f);
+  }
+}
+
+/* ---------- init ---------- */
+buildSnow();
+chooseCharacter('mia');
+renderCharacter();
+</script>
+</body>
+</html>
